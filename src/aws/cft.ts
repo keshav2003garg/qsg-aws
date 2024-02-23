@@ -1,0 +1,284 @@
+export const cloudFormationTemplate = {
+    Transform: 'AWS::Serverless-2016-10-31',
+    Resources: {
+        apiGateway: {
+            Type: 'AWS::Serverless::Api',
+            Properties: {
+                Name: {
+                    'Fn::Sub': [
+                        '${ResourceName} From Stack ${AWS::StackName}',
+                        {
+                            ResourceName: 'apiGateway',
+                        },
+                    ],
+                },
+                StageName: 'v1',
+                DefinitionBody: {
+                    openapi: '3.0',
+                    info: {},
+                    paths: {
+                        '/process-video': {
+                            post: {
+                                'x-amazon-apigateway-integration': {
+                                    httpMethod: 'POST',
+                                    type: 'aws_proxy',
+                                    uri: {
+                                        'Fn::Sub':
+                                            'arn:${AWS::Partition}:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${api.Arn}/invocations',
+                                    },
+                                },
+                                responses: {},
+                            },
+                        },
+                    },
+                },
+                EndpointConfiguration: 'REGIONAL',
+                TracingEnabled: true,
+                Cors: {
+                    MaxAge: 5,
+                },
+                Auth: {
+                    ApiKeyRequired: true,
+                    UsagePlan: {
+                        CreateUsagePlan: 'PER_API',
+                        UsagePlanName: 'GatewayAuthorizationUsagePlan',
+                        Description: 'Usage plan for this API',
+                        Quota: {
+                            Limit: 2000,
+                            Period: 'MONTH',
+                        },
+                        Throttle: {
+                            BurstLimit: 5,
+                            RateLimit: 100,
+                        },
+                    },
+                },
+            },
+        },
+        api: {
+            Type: 'AWS::Serverless::Function',
+            Properties: {
+                Description: {
+                    'Fn::Sub': [
+                        'Stack ${AWS::StackName} Function ${ResourceName}',
+                        {
+                            ResourceName: 'api',
+                        },
+                    ],
+                },
+                CodeUri: 's3://blogscape/api.zip',
+                Handler: 'index.handler',
+                Runtime: 'nodejs20.x',
+                MemorySize: 3008,
+                Timeout: 30,
+                Tracing: 'Active',
+                Environment: {
+                    Variables: {
+                        SQS_QUEUE_NAME: {
+                            'Fn::GetAtt': ['queue', 'QueueName'],
+                        },
+                        SQS_QUEUE_ARN: {
+                            'Fn::GetAtt': ['queue', 'Arn'],
+                        },
+                        SQS_QUEUE_URL: {
+                            Ref: 'queue',
+                        },
+                    },
+                },
+                Policies: [
+                    {
+                        SQSSendMessagePolicy: {
+                            QueueName: {
+                                'Fn::GetAtt': ['queue', 'QueueName'],
+                            },
+                        },
+                    },
+                ],
+                Events: {
+                    apiGatewayPOSTprocessvideo: {
+                        Type: 'Api',
+                        Properties: {
+                            Path: '/process-video',
+                            Method: 'POST',
+                            RestApiId: {
+                                Ref: 'apiGateway',
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        apiLogGroup: {
+            Type: 'AWS::Logs::LogGroup',
+            DeletionPolicy: 'Retain',
+            Properties: {
+                LogGroupName: {
+                    'Fn::Sub': '/aws/lambda/${api}',
+                },
+            },
+        },
+        queue: {
+            Type: 'AWS::SQS::Queue',
+            Properties: {
+                FifoQueue: true,
+                ContentBasedDeduplication: true,
+                MessageRetentionPeriod: 345600,
+            },
+        },
+        consumer: {
+            Type: 'AWS::Serverless::Function',
+            Properties: {
+                Description: {
+                    'Fn::Sub': [
+                        'Stack ${AWS::StackName} Function ${ResourceName}',
+                        {
+                            ResourceName: 'consumer',
+                        },
+                    ],
+                },
+                CodeUri: 's3://blogscape/consumer.zip',
+                Handler: 'index.handler',
+                Runtime: 'nodejs20.x',
+                MemorySize: 3008,
+                Timeout: 30,
+                Tracing: 'Active',
+                Environment: {
+                    Variables: {
+                        ECS_TASK_DEFINITION: {
+                            Ref: 'QSGTaskDefinition',
+                        },
+                    },
+                },
+                Events: {
+                    queue: {
+                        Type: 'SQS',
+                        Properties: {
+                            Queue: {
+                                'Fn::GetAtt': ['queue', 'Arn'],
+                            },
+                            BatchSize: 5,
+                        },
+                    },
+                },
+            },
+        },
+        consumerLogGroup: {
+            Type: 'AWS::Logs::LogGroup',
+            DeletionPolicy: 'Retain',
+            Properties: {
+                LogGroupName: {
+                    'Fn::Sub': '/aws/lambda/${consumer}',
+                },
+            },
+        },
+        QSGCluster: {
+            Type: 'AWS::ECS::Cluster',
+            Properties: {
+                ClusterName: 'qsg-cluster',
+            },
+        },
+        QSGTaskDefinition: {
+            Type: 'AWS::ECS::TaskDefinition',
+            Properties: {
+                ContainerDefinitions: [
+                    {
+                        Name: 'qsg-image',
+                        Image: 'https://registry.hub.docker.com/_/ubuntu',
+                        Cpu: 0,
+                        Essential: true,
+                        LogConfiguration: {
+                            LogDriver: 'awslogs',
+                            Options: {
+                                'awslogs-create-group': 'true',
+                                'awslogs-group': '/ecs/qsg-task',
+                                'awslogs-region': 'ap-south-1',
+                                'awslogs-stream-prefix': 'ecs',
+                            },
+                        },
+                    },
+                ],
+                Family: 'qsg-task',
+                Cpu: '1024',
+                Memory: '3072',
+                ExecutionRoleArn: {
+                    'Fn::GetAtt': ['ECSTaksExecutionRole', 'Arn'],
+                },
+            },
+        },
+        ECSTaksExecutionRole: {
+            Type: 'AWS::IAM::Role',
+            Properties: {
+                RoleName: 'ECSTaksExecutionRole',
+                AssumeRolePolicyDocument: {
+                    Version: '2012-10-17',
+                    Statement: [
+                        {
+                            Effect: 'Allow',
+                            Principal: {
+                                Service: 'ecs-tasks.amazonaws.com',
+                            },
+                            Action: 'sts:AssumeRole',
+                        },
+                    ],
+                },
+                ManagedPolicyArns: [
+                    'arn:aws:iam::aws:policy/AmazonS3FullAccess',
+                ],
+            },
+        },
+        QSGBucket: {
+            Type: 'AWS::S3::Bucket',
+            Properties: {
+                BucketName: {
+                    'Fn::Sub': '${AWS::StackName}-qsgbucket-${AWS::AccountId}',
+                },
+                BucketEncryption: {
+                    ServerSideEncryptionConfiguration: [
+                        {
+                            ServerSideEncryptionByDefault: {
+                                SSEAlgorithm: 'aws:kms',
+                                KMSMasterKeyID: 'alias/aws/s3',
+                            },
+                        },
+                    ],
+                },
+                PublicAccessBlockConfiguration: {
+                    IgnorePublicAcls: true,
+                    RestrictPublicBuckets: true,
+                },
+            },
+        },
+        QSGBucketBucketPolicy: {
+            Type: 'AWS::S3::BucketPolicy',
+            Properties: {
+                Bucket: {
+                    Ref: 'QSGBucket',
+                },
+                PolicyDocument: {
+                    Id: 'RequireEncryptionInTransit',
+                    Version: '2012-10-17',
+                    Statement: [
+                        {
+                            Principal: '*',
+                            Action: '*',
+                            Effect: 'Deny',
+                            Resource: [
+                                {
+                                    'Fn::GetAtt': ['QSGBucket', 'Arn'],
+                                },
+                                {
+                                    'Fn::Sub': '${QSGBucket.Arn}/*',
+                                },
+                            ],
+                            Condition: {
+                                Bool: {
+                                    'aws:SecureTransport': 'false',
+                                },
+                            },
+                        },
+                    ],
+                },
+            },
+        },
+    },
+};
