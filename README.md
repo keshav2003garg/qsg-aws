@@ -2,7 +2,7 @@
 
 The npx script utilizes Amazon Web Services (AWS) infrastructure to efficiently process videos by converting them into various quality formats and incorporating subtitles. It simplifies the process of deployment of essential AWS resources onto your account. By leveraging AWS CloudFormation, it automates the creation of resources like API Gateway, Lambda functions, SQS, ECS, and S3. This means that with just one command, you can deploy the entire infrastructure on your AWS account. This user-friendly approach streamlines the setup process, making it easy for users to implement a cost-optimized and scalable video processing solution without the hassle of manual resource creation.
 
-![alt text](https://github.com/keshav2003garg/qsg-aws/tree/main/example/aws-infra.png?raw=true)
+![alt aws-infra](https://github.com/keshav2003garg/qsg-aws/assets/92546019/343c1619-5fad-4f89-9484-dd868a58f5fd)
 
 ## Requirements:
 
