@@ -1,7 +1,7 @@
 {
     "name": "qsg-aws",
     "version": "0.1.0",
-    "description": "",
+    "description": "Automate video processing on AWS with one command! Deploy key resources like API Gateway, Lambda, SQS, ECS, and S3 using CloudFormation for easy, scalable video conversion with subtitles",
     "main": "lib/index.js",
     "bin": {
         "qsg-aws": "lib/index.js"
@@ -36,10 +36,7 @@
         "typescript": "^5.3.3"
     },
     "dependencies": {
-        "@aws-sdk/client-apigatewayv2": "^3.521.0",
         "@aws-sdk/client-cloudformation": "^3.515.0",
-        "@inquirer/prompts": "^4.1.0",
-        "inquirer": "^9.2.15",
-        "node-fetch": "^3.3.2"
+        "@inquirer/prompts": "^4.1.0"
     }
 }

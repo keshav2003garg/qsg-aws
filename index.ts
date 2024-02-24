@@ -12,7 +12,7 @@ async function main() {
         const credentials = getAWSCredentials();
         const answer = await confirm({
             message:
-                'Do you really want to deploy infrastructure on your aws account? \n  Your aws credentials will be automatically picked from your aws config file. \n  Make sure you have the right permissions to deploy infrastructure. \n  This will create a new stack called qsg-INFRA-STACK. \n  This will take a few minutes to complete. \n  Are you sure you want to continue? \n  Press Enter to continue or Ctrl+C to cancel.',
+                'Do you really want to deploy infrastructure on your aws account? \n  Your aws credentials will be automatically picked from your aws config file. \n  Make sure you have the right permissions to deploy infrastructure. \n  This will create a new stack called qsg. \n  This will take a few minutes to complete. \n  Are you sure you want to continue? \n  Press Enter to continue or Ctrl+C to cancel.',
         });
         if (answer) {
             const animation = printProcessingAnimation();
